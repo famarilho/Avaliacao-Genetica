@@ -25,7 +25,7 @@
 
         .container {
             width: 100%;
-            max-width: 600px;
+            max-width: 680px;
             background: var(--card-bg);
             padding: 24px;
             border-radius: 16px;
@@ -98,30 +98,47 @@
             border-radius: 8px;
             display: none;
             font-size: 14px;
+            word-break: break-word;
         }
 
-        .status.loading {
-            display: block;
-            background: #e3f2fd;
-            color: #0d47a1;
-        }
-
-        .status.success {
-            display: block;
-            background: #e8f5e9;
-            color: #1b5e20;
-        }
-
-        .status.error {
-            display: block;
-            background: #ffebee;
-            color: #c62828;
-        }
+        .status.loading { display: block; background: #e3f2fd; color: #0d47a1; }
+        .status.success { display: block; background: #e8f5e9; color: #1b5e20; }
+        .status.error { display: block; background: #ffebee; color: #c62828; }
 
         .results {
             margin-top: 24px;
             display: none;
         }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn-dl {
+            background-color: #0277bd;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .btn-dl:hover { background-color: #01579b; }
+
+        .btn-dl-zip {
+            grid-column: span 2;
+            background-color: #2e7d32;
+            font-size: 15px;
+            padding: 12px;
+        }
+
+        .btn-dl-zip:hover { background-color: #1b5e20; }
 
         .animal-card {
             background: #f9f9f9;
@@ -134,22 +151,30 @@
         .animal-card .title {
             font-weight: bold;
             font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .animal-card .badge {
-            display: inline-block;
             background: var(--primary);
             color: white;
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 12px;
-            float: right;
         }
 
         .animal-card .details {
             font-size: 13px;
             color: #555;
             margin-top: 6px;
+        }
+
+        .actions-box {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f0f4f8;
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -177,20 +202,43 @@
             <input type="file" id="file_dam" accept=".xlsx" required>
         </div>
 
+        <div class="form-group">
+            <label for="file_params">4. Ficheiro de Parâmetros Genéticos (.txt)</label>
+            <input type="file" id="file_params" accept=".txt" required>
+        </div>
+
         <button type="submit" id="btnSubmit">🚀 Executar Avaliação Genética</button>
     </form>
 
     <div id="statusBox" class="status"></div>
 
     <div id="resultsBox" class="results">
-        <h3>📊 Melhores Animais (Índice de Seleção)</h3>
+        <div class="actions-box">
+            <h3 style="margin: 0 0 10px 0;">📥 Baixar Relatórios em Excel (.xlsx)</h3>
+            <div class="download-grid">
+                <button class="btn-dl" onclick="downloadFile('Relatório Machos.xlsx')">📊 Relatório Machos</button>
+                <button class="btn-dl" onclick="downloadFile('Relatório Femeas.xlsx')">📊 Relatório Fêmeas</button>
+                <button class="btn-dl" onclick="downloadFile('Relatório Carneiros.xlsx')">🐑 Relatório Carneiros</button>
+                <button class="btn-dl" onclick="downloadFile('Relatório Ovelhas.xlsx')">🐑 Relatório Ovelhas</button>
+                <button class="btn-dl" onclick="downloadFile('Percentis.xlsx')">📈 Percentis</button>
+                <button class="btn-dl" onclick="downloadFile('RESUMO.xlsx')">📋 RESUMO Geral</button>
+                <button class="btn-dl" onclick="downloadFile('02_prestacao_contas_exclusoes.xlsx')">⚠️ Prestação de Contas</button>
+                <button class="btn-dl" onclick="downloadTxt()">📄 Parametros_Geneticos.txt</button>
+                <button class="btn-dl btn-dl-zip" onclick="downloadFile('Pacote_Completo.zip', 'Relatorios_BLUP_Texel.zip')">📦 Baixar Todos os Arquivos (.zip)</button>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 24px;">📊 Melhores Animais (Top 10 Índice de Seleção)</h3>
         <div id="animalList"></div>
     </div>
 </div>
 
 <script>
-    // URL pública do Render configurada para o endpoint /avaliar
-    const API_URL = "https://avaliacao-genetica.onrender.com/avaliar"; 
+    // URL da API local do FastAPI
+    const API_URL = "http://127.0.0.1:8000/avaliar"; 
+
+    let globalArquivos = {};
+    let globalTxtContent = "";
 
     document.getElementById('uploadForm').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -202,13 +250,14 @@
 
         btn.disabled = true;
         statusBox.className = "status loading";
-        statusBox.innerText = "⏳ A processar avaliação genética na nuvem (BLUP)... Por favor aguarde.";
+        statusBox.innerText = "⏳ A processar avaliação genética via MME (BLUP)... Por favor aguarde.";
         resultsBox.style.display = "none";
 
         const formData = new FormData();
         formData.append('file_dados', document.getElementById('file_dados').files[0]);
         formData.append('file_ped', document.getElementById('file_ped').files[0]);
         formData.append('file_dam', document.getElementById('file_dam').files[0]);
+        formData.append('file_params', document.getElementById('file_params').files[0]);
 
         try {
             const response = await fetch(API_URL, {
@@ -217,15 +266,18 @@
             });
 
             if (!response.ok) {
-                throw new Error("Erro no processamento do servidor.");
+                const errText = await response.text();
+                throw new Error(`Servidor respondeu com código ${response.status}: ${errText || 'Falha no processamento.'}`);
             }
 
             const data = await response.json();
 
+            globalArquivos = data.arquivos;
+            globalTxtContent = data.parametros_txt;
+
             statusBox.className = "status success";
             statusBox.innerText = `✅ Avaliação concluída com sucesso! Total de animais avaliados: ${data.total_avaliados}`;
 
-            // Ordenar por Índice e listar os top 10
             const ordenados = data.resultados.sort((a, b) => b.Indice - a.Indice).slice(0, 10);
             
             animalList.innerHTML = "";
@@ -234,7 +286,7 @@
                 card.className = 'animal-card';
                 card.innerHTML = `
                     <div class="title">
-                        ID: ${anim.Name}
+                        <span>ID: ${anim.Name}</span>
                         <span class="badge">Top ${anim.Perc_Indice}%</span>
                     </div>
                     <div class="details">
@@ -251,11 +303,40 @@
 
         } catch (err) {
             statusBox.className = "status error";
-            statusBox.innerText = "❌ Erro ao ligar à API. Verifique a ligação ou o link do servidor.";
+            statusBox.innerText = `❌ ${err.message || 'Erro ao conectar à API.'}`;
+            console.error("Detalhes do erro:", err);
         } finally {
             btn.disabled = false;
         }
     });
+
+    function downloadFile(keyName, customFilename = null) {
+        if (!globalArquivos[keyName]) return;
+        const b64Data = globalArquivos[keyName];
+        const mimeType = keyName.endsWith('.zip') ? 'application/zip' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        
+        const byteCharacters = atob(b64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = customFilename || keyName;
+        link.click();
+    }
+
+    function downloadTxt() {
+        if (!globalTxtContent) return;
+        const blob = new Blob([globalTxtContent], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'Parametros_Geneticos.txt';
+        link.click();
+    }
 </script>
 
 </body>
