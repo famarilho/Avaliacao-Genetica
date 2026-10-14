@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avaliação Genética Ovinos</title>
+    <title>Otimização de Acasalamentos Ovinos</title>
     <style>
         :root {
-            --primary: #2e7d32;
-            --primary-dark: #1b5e20;
+            --primary: #1b5e20;
+            --primary-light: #2e7d32;
             --bg: #f4f6f8;
             --card-bg: #ffffff;
             --text: #333333;
@@ -60,18 +60,19 @@
             font-size: 14px;
         }
 
-        input[type="file"] {
+        input[type="file"], select, input[type="number"] {
             width: 100%;
             padding: 10px;
-            border: 2px dashed #ccc;
+            border: 1px solid #ccc;
             border-radius: 8px;
             background: #fafafa;
             box-sizing: border-box;
+            font-size: 14px;
         }
 
         button {
             width: 100%;
-            background-color: var(--primary);
+            background-color: var(--primary-light);
             color: white;
             border: none;
             padding: 14px;
@@ -83,14 +84,8 @@
             transition: background 0.2s;
         }
 
-        button:hover {
-            background-color: var(--primary-dark);
-        }
-
-        button:disabled {
-            background-color: #a5d6a7;
-            cursor: not-allowed;
-        }
+        button:hover { background-color: var(--primary); }
+        button:disabled { background-color: #a5d6a7; cursor: not-allowed; }
 
         .status {
             margin-top: 16px;
@@ -98,7 +93,6 @@
             border-radius: 8px;
             display: none;
             font-size: 14px;
-            word-break: break-word;
         }
 
         .status.loading { display: block; background: #e3f2fd; color: #0d47a1; }
@@ -108,156 +102,110 @@
         .results {
             margin-top: 24px;
             display: none;
-        }
-
-        .download-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 12px;
+            background: #f0f4f8;
+            padding: 16px;
+            border-radius: 8px;
         }
 
         .btn-dl {
             background-color: #0277bd;
             color: white;
-            padding: 10px;
+            padding: 12px;
             border-radius: 6px;
             border: none;
-            font-size: 13px;
+            font-size: 14px;
             cursor: pointer;
-            text-align: center;
-            font-weight: 600;
+            width: 100%;
+            font-weight: bold;
+            margin-top: 10px;
         }
 
         .btn-dl:hover { background-color: #01579b; }
-
-        .btn-dl-zip {
-            grid-column: span 2;
-            background-color: #2e7d32;
-            font-size: 15px;
-            padding: 12px;
-        }
-
-        .btn-dl-zip:hover { background-color: #1b5e20; }
-
-        .animal-card {
-            background: #f9f9f9;
-            border-left: 4px solid var(--primary);
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-        }
-
-        .animal-card .title {
-            font-weight: bold;
-            font-size: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .animal-card .badge {
-            background: var(--primary);
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-        }
-
-        .animal-card .details {
-            font-size: 13px;
-            color: #555;
-            margin-top: 6px;
-        }
-
-        .actions-box {
-            margin-top: 20px;
-            padding: 16px;
-            background: #f0f4f8;
-            border-radius: 8px;
-        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h1>🐑 Avaliação Genética Ovinos</h1>
-        <p>Sistema gratuito de avaliação de ovinos para produtores</p>
+        <h1>🧬 Otimização de Acasalamentos Ovinos</h1>
+        <p>Acasalamento direcionado para maximização de DEPs e controle de endogamia</p>
     </div>
 
-    <form id="uploadForm">
+    <form id="optForm">
         <div class="form-group">
-            <label for="file_dados">1. Ficheiro de Desempenho (.xlsx)</label>
-            <input type="file" id="file_dados" accept=".xlsx" required>
+            <label for="file_machos">1. Relatório de Machos / Carneiros (.xlsx)</label>
+            <input type="file" id="file_machos" accept=".xlsx" required>
         </div>
 
         <div class="form-group">
-            <label for="file_ped">2. Ficheiro de Pedigree (.xlsx)</label>
+            <label for="file_femeas">2. Relatório de Fêmeas / Ovelhas (.xlsx)</label>
+            <input type="file" id="file_femeas" accept=".xlsx" required>
+        </div>
+
+        <div class="form-group">
+            <label for="file_ped">3. Ficheiro de Pedigree (.xlsx)</label>
             <input type="file" id="file_ped" accept=".xlsx" required>
         </div>
 
         <div class="form-group">
-            <label for="file_dam">3. Ficheiro das Mães (.xlsx)</label>
-            <input type="file" id="file_dam" accept=".xlsx" required>
+            <label for="dep_alvo">4. DEP a Maximizar no Produto:</label>
+            <select id="dep_alvo">
+                <option value="DEP_PD">1. DEP Peso ao Desmame Direto (PD Dir)</option>
+                <option value="DEP_MAT_PD">2. DEP Peso ao Desmame Materno (PD Mat)</option>
+                <option value="DEP_PPD">3. DEP Peso ao Pós-Desmame (PPD)</option>
+            </select>
         </div>
 
         <div class="form-group">
-            <label for="file_params">4. Ficheiro de Parâmetros Genéticos (.txt)</label>
-            <input type="file" id="file_params" accept=".txt" required>
+            <label for="limite_f">5. Limite Máximo de Endogamia do Produto:</label>
+            <select id="limite_f">
+                <option value="0.0">1. Coeficiente de endogamia igual a 0% (Sem parentesco)</option>
+                <option value="0.0625" selected>2. Coeficiente de endogamia entre 0% e 6.25% (Até meio-primos)</option>
+                <option value="0.125">3. Coeficiente de endogamia entre 6.25% e 12.5% (Até primos-irmãos)</option>
+                <option value="0.25">4. Coeficiente de endogamia entre 12.5% e 25.0% (Até pai-filha/irmãos)</option>
+            </select>
         </div>
 
-        <button type="submit" id="btnSubmit">🚀 Executar Avaliação Genética</button>
+        <div class="form-group">
+            <label for="max_femeas">6. Limite Máximo de Fêmeas por Macho:</label>
+            <input type="number" id="max_femeas" value="50" min="1" max="300">
+        </div>
+
+        <button type="submit" id="btnSubmit">🎯 Gerar Plano de Acasalamentos</button>
     </form>
 
     <div id="statusBox" class="status"></div>
 
     <div id="resultsBox" class="results">
-        <div class="actions-box">
-            <h3 style="margin: 0 0 10px 0;">📥 Baixar Relatórios em Excel (.xlsx)</h3>
-            <div class="download-grid">
-                <button class="btn-dl" onclick="downloadFile('Relatório Machos.xlsx')">📊 Relatório Machos</button>
-                <button class="btn-dl" onclick="downloadFile('Relatório Femeas.xlsx')">📊 Relatório Fêmeas</button>
-                <button class="btn-dl" onclick="downloadFile('Relatório Carneiros.xlsx')">🐑 Relatório Carneiros</button>
-                <button class="btn-dl" onclick="downloadFile('Relatório Ovelhas.xlsx')">🐑 Relatório Ovelhas</button>
-                <button class="btn-dl" onclick="downloadFile('Percentis.xlsx')">📈 Percentis</button>
-                <button class="btn-dl" onclick="downloadFile('RESUMO.xlsx')">📋 RESUMO Geral</button>
-                <button class="btn-dl" onclick="downloadFile('02_prestacao_contas_exclusoes.xlsx')">⚠️ Prestação de Contas</button>
-                <button class="btn-dl" onclick="downloadTxt()">📄 Parametros_Geneticos.txt</button>
-                <button class="btn-dl btn-dl-zip" onclick="downloadFile('Pacote_Completo.zip', 'Relatorios_BLUP_Ovinos.zip')">📦 Baixar Todos os Arquivos (.zip)</button>
-            </div>
-        </div>
-
-        <h3 style="margin-top: 24px;">📊 Melhores Animais (Top 10 Índice de Seleção)</h3>
-        <div id="animalList"></div>
+        <h3 style="margin-top: 0;">📊 Resumo da Otimização</h3>
+        <p id="resSummary"></p>
+        <button class="btn-dl" id="btnDownload">📥 Baixar Plano de Acasalamentos (.xlsx)</button>
     </div>
 </div>
 
 <script>
-    // Substitua a URL abaixo pela sua URL do Render (com /avaliar/ no final)
-    const API_URL = "https://avaliacao-genetica-1.onrender.com/avaliar/"; 
+    const API_URL = "https://avaliacao-genetica-1.onrender.com/otimizar_acasalamento/";
+    let excelB64 = "";
 
-    let globalArquivos = {};
-    let globalTxtContent = "";
-
-    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    document.getElementById('optForm').addEventListener('submit', async function(e) {
         e.preventDefault();
 
         const btn = document.getElementById('btnSubmit');
         const statusBox = document.getElementById('statusBox');
         const resultsBox = document.getElementById('resultsBox');
-        const animalList = document.getElementById('animalList');
 
         btn.disabled = true;
         statusBox.className = "status loading";
-        statusBox.innerText = "⏳ A processar avaliação genética via MME (BLUP)... Por favor aguarde.";
+        statusBox.innerText = "⏳ A calcular coeficientes de endogamia e otimizando acasalamentos...";
         resultsBox.style.display = "none";
 
         const formData = new FormData();
-        formData.append('file_dados', document.getElementById('file_dados').files[0]);
+        formData.append('file_machos', document.getElementById('file_machos').files[0]);
+        formData.append('file_femeas', document.getElementById('file_femeas').files[0]);
         formData.append('file_ped', document.getElementById('file_ped').files[0]);
-        formData.append('file_dam', document.getElementById('file_dam').files[0]);
-        formData.append('file_params', document.getElementById('file_params').files[0]);
+        formData.append('dep_alvo', document.getElementById('dep_alvo').value);
+        formData.append('limite_f', document.getElementById('limite_f').value);
+        formData.append('max_femeas_por_macho', document.getElementById('max_femeas').value);
 
         try {
             const response = await fetch(API_URL, {
@@ -267,76 +215,39 @@
 
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error(`Servidor respondeu com código ${response.status}: ${errText || 'Falha no processamento.'}`);
+                throw new Error(`Erro do servidor (${response.status}): ${errText}`);
             }
 
             const data = await response.json();
-
-            globalArquivos = data.arquivos;
-            globalTxtContent = data.parametros_txt;
+            excelB64 = data.arquivo_excel_b64;
 
             statusBox.className = "status success";
-            statusBox.innerText = `✅ Avaliação concluída com sucesso! Total de animais avaliados: ${data.total_avaliados}`;
+            statusBox.innerText = "✅ Plano de acasalamentos gerado com sucesso!";
 
-            const ordenados = data.resultados.sort((a, b) => b.Indice - a.Indice).slice(0, 10);
-            
-            animalList.innerHTML = "";
-            ordenados.forEach(anim => {
-                const card = document.createElement('div');
-                card.className = 'animal-card';
-                card.innerHTML = `
-                    <div class="title">
-                        <span>ID: ${anim.Name}</span>
-                        <span class="badge">Top ${anim.Perc_Indice}%</span>
-                    </div>
-                    <div class="details">
-                        <b>Índice:</b> ${anim.Indice.toFixed(2)} | 
-                        <b>DEP PD:</b> ${anim.DEP_PD.toFixed(2)} | 
-                        <b>DEP MAT:</b> ${anim.DEP_MAT_PD.toFixed(2)} | 
-                        <b>DEP PPD:</b> ${anim.DEP_PPD.toFixed(2)}
-                    </div>
-                `;
-                animalList.appendChild(card);
-            });
+            document.getElementById('resSummary').innerHTML = `
+                <b>Total de Fêmeas:</b> ${data.total_femeas}<br>
+                <b>Acasalamentos Válidos:</b> ${data.acasalamentos_realizados}<br>
+                <b>DEP Média Esperada da Safra:</b> +${data.dep_media_produtos} kg<br>
+                <b>Endogamia Média Esperada:</b> ${data.endogamia_media_produtos_pct}%
+            `;
 
             resultsBox.style.display = "block";
 
         } catch (err) {
             statusBox.className = "status error";
-            statusBox.innerText = `❌ ${err.message || 'Erro ao conectar à API.'}`;
-            console.error("Detalhes do erro:", err);
+            statusBox.innerText = `❌ ${err.message || 'Erro ao comunicar com a API.'}`;
         } finally {
             btn.disabled = false;
         }
     });
 
-    function downloadFile(keyName, customFilename = null) {
-        if (!globalArquivos[keyName]) return;
-        const b64Data = globalArquivos[keyName];
-        const mimeType = keyName.endsWith('.zip') ? 'application/zip' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-        
-        const byteCharacters = atob(b64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: mimeType });
-        
+    document.getElementById('btnDownload').addEventListener('click', function() {
+        if (!excelB64) return;
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = customFilename || keyName;
+        link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + excelB64;
+        link.download = 'Plano_de_Acasalamento_Otimizado.xlsx';
         link.click();
-    }
-
-    function downloadTxt() {
-        if (!globalTxtContent) return;
-        const blob = new Blob([globalTxtContent], { type: 'text/plain;charset=utf-8' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'Parametros_Geneticos.txt';
-        link.click();
-    }
+    });
 </script>
 
 </body>
