@@ -14,7 +14,7 @@ from blup import executar_blup_bivariado
 
 app = FastAPI(title="API de Avaliação Genética Texel")
 
-# Configuração de CORS permissiva para aceitar requisições do GitHub Pages / Pinggy / Ngrok
+# Configuração permissiva de CORS para aceitar requisições de qualquer origem (GitHub Pages, etc.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,7 +28,7 @@ app.add_middleware(
 def home():
     return {"mensagem": "API de Avaliação Genética no ar com sucesso!"}
 
-# Trata requisições preflight (OPTIONS) do navegador para qualquer rota sem bloqueios CORS
+# Preflight handler (OPTIONS) para precaver bloqueios do navegador
 @app.options("/{full_path:path}")
 async def options_handler(full_path: str):
     return {}
@@ -67,7 +67,7 @@ def ler_parametros_txt(conteudo_txt: str) -> dict:
     }
 
 def montar_relatorio_individual(df_input: pd.DataFrame) -> pd.DataFrame:
-    """Monta estrutura de 3 linhas por animal (DEP, Acurácia, Top %) conforme a função R."""
+    """Monta estrutura de 3 linhas por animal (DEP, Acurácia, Top %)."""
     rows = []
     for _, row in df_input.iterrows():
         name = str(row['Name'])
@@ -95,7 +95,7 @@ def montar_relatorio_individual(df_input: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 def montar_relatorio_pais(df_input: pd.DataFrame, relatorio_geral: pd.DataFrame, id_col: str, nome_id: str) -> pd.DataFrame:
-    """Monta estrutura de 3 linhas por pai/mãe com contagem de progênies conforme a função R."""
+    """Monta estrutura de 3 linhas por pai/mãe com contagem de progênies."""
     rows = []
     col_fbb = f"FBB_{nome_id}"
     col_nome = f"NOME_{nome_id}"
@@ -237,7 +237,9 @@ def gerar_relatorios_excel(relatorio_df: pd.DataFrame, df_log: pd.DataFrame, dat
 
     return arquivos_b64
 
+# Aceita POST com ou sem barra no final para evitar o erro 405 por redirecionamento
 @app.post("/avaliar")
+@app.post("/avaliar/")
 async def avaliar_genetica(
     file_dados: UploadFile = File(...),
     file_ped: UploadFile = File(...),
