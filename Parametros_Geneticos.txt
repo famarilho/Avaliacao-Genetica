@@ -1,0 +1,23 @@
+============================================================
+       PARÂMETROS GENÉTICOS ESTIMADOS - OVINO TEXEL          
+============================================================
+
+--- PESO À DESMAMA (PD) ---
+Variância Aditiva Direta (Va_dir_pd):  35.3779
+Variância Aditiva Materna (Va_mat_pd): 7.3491
+Variância Residual (Ve_pd):            2.9407
+Variância Fenotípica (Vp_pd):          45.6677
+Herdabilidade Direta (h2_dir_pd):      0.7747
+Herdabilidade Materna (h2_mat_pd):     0.1609
+
+--- PESO PÓS-DESMAMA (PPD) ---
+Variância Aditiva Direta (Va_ppd):     29.6199
+Variância Residual (Ve_ppd):           17.7205
+Variância Fenotípica (Vp_ppd):         47.3404
+Herdabilidade Direta (h2_ppd):         0.6257
+
+--- COVARIÂNCIA E CORRELAÇÃO GENÉTICA ---
+Covariância Genética Direta (PD x PPD): 31.0289
+Correlação Genética Direta (rg_PD_PPD): 0.9585
+
+============================================================
