@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import numpy as np
@@ -12,9 +12,9 @@ from typing import Optional
 from auditoria import auditar_e_preparar_dados
 from blup import executar_blup_bivariado
 
-app = FastAPI(title="API de Avaliação Genética e Acasalamento Ovinos")
+app = FastAPI(title="API de Avaliação Genética Texel")
 
-# Configuração permissiva de CORS para aceitar requisições do GitHub Pages / Nuvem
+# Configuração permissiva de CORS para aceitar requisições de qualquer origem (GitHub Pages, etc.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,16 +26,12 @@ app.add_middleware(
 
 @app.get("/")
 def home():
-    return {"mensagem": "API de Avaliação Genética e Otimização de Acasalamentos no ar!"}
+    return {"mensagem": "API de Avaliação Genética no ar com sucesso!"}
 
-# Preflight handler (OPTIONS) para precaver bloqueios CORS do navegador
+# Preflight handler (OPTIONS) para precaver bloqueios do navegador
 @app.options("/{full_path:path}")
 async def options_handler(full_path: str):
     return {}
-
-# ==============================================================================
-# FUNÇÕES AUXILIARES - AVALIAÇÃO GENÉTICA (BLUP)
-# ==============================================================================
 
 def ler_parametros_txt(conteudo_txt: str) -> dict:
     """Extrai os parâmetros genéticos a partir do arquivo TXT gerado pelo R."""
@@ -193,7 +189,7 @@ def gerar_relatorios_excel(relatorio_df: pd.DataFrame, df_log: pd.DataFrame, dat
             'Idade_Mae': [round(float(data_final['age_dam'].mean()), 1)]
         }),
         'Indice': pd.DataFrame({
-            'Indice': ['Indice Base 100'],
+            'Indice': ['Indice Texel Base 100'],
             'Formula': ['100 + 25% * DEP_PD + 25% * DEP_MAT_PD + 50% * DEP_PPD']
         }),
         'Parametros Geneticos': pd.DataFrame({
@@ -241,54 +237,7 @@ def gerar_relatorios_excel(relatorio_df: pd.DataFrame, df_log: pd.DataFrame, dat
 
     return arquivos_b64
 
-# ==============================================================================
-# FUNÇÕES AUXILIARES - OTIMIZAÇÃO DE ACASALAMENTOS
-# ==============================================================================
-
-def calcular_matriz_parentesco(df_ped: pd.DataFrame) -> tuple[np.ndarray, dict]:
-    """Calcula a Matriz de Parentesco Aditivo (A) via Algoritmo de Wright/Henderson."""
-    df_ped = df_ped.copy()
-    for col in ['Name', 'Sire', 'Dam']:
-        if col in df_ped.columns:
-            df_ped[col] = df_ped[col].astype(str).str.strip().replace(['0', 'NA', 'nan', 'None', ''], '0')
-
-    all_ids = set(df_ped['Name']).union(set(df_ped['Sire'])).union(set(df_ped['Dam'])) - {'0'}
-    sorted_ids = sorted(list(all_ids))
-    id_map = {id_: i for i, id_ in enumerate(sorted_ids)}
-    n = len(sorted_ids)
-
-    sire_idx = np.zeros(n, dtype=int) - 1
-    dam_idx = np.zeros(n, dtype=int) - 1
-
-    for _, row in df_ped.iterrows():
-        i = id_map[row['Name']]
-        if row['Sire'] != '0' and row['Sire'] in id_map: sire_idx[i] = id_map[row['Sire']]
-        if row['Dam'] != '0' and row['Dam'] in id_map: dam_idx[i] = id_map[row['Dam']]
-
-    A = np.zeros((n, n), dtype=float)
-    for i in range(n):
-        s = sire_idx[i]
-        d = dam_idx[i]
-
-        if s >= 0 and d >= 0:
-            A[i, i] = 1.0 + 0.5 * A[s, d]
-        else:
-            A[i, i] = 1.0
-
-        for j in range(i):
-            cov = 0.0
-            if s >= 0: cov += 0.5 * A[s, j]
-            if d >= 0: cov += 0.5 * A[d, j]
-            A[i, j] = cov
-            A[j, i] = cov
-
-    return A, id_map
-
-
-# ==============================================================================
-# ENDPOINT 1: AVALIAÇÃO GENÉTICA (BLUP)
-# ==============================================================================
-
+# Aceita POST com ou sem barra no final para evitar o erro 405 por redirecionamento
 @app.post("/avaliar")
 @app.post("/avaliar/")
 async def avaliar_genetica(
@@ -347,127 +296,3 @@ async def avaliar_genetica(
         if os.path.exists(path_dados): os.remove(path_dados)
         if os.path.exists(path_ped): os.remove(path_ped)
         if os.path.exists(path_dam): os.remove(path_dam)
-
-
-# ==============================================================================
-# ENDPOINT 2: OTIMIZAÇÃO DE ACASALAMENTOS
-# ==============================================================================
-
-@app.post("/otimizar_acasalamento")
-@app.post("/otimizar_acasalamento/")
-async def otimizar_acasalamento(
-    file_machos: UploadFile = File(...),
-    file_femeas: UploadFile = File(...),
-    file_ped: UploadFile = File(...),
-    dep_alvo: str = Form(...),          # 'DEP_PD', 'DEP_MAT_PD', ou 'DEP_PPD'
-    limite_f: float = Form(...),        # Limite superior de endogamia (0.0, 0.0625, 0.125, 0.25)
-    max_femeas_por_macho: int = Form(50)
-):
-    try:
-        df_machos = pd.read_excel(io.BytesIO(await file_machos.read()))
-        df_femeas = pd.read_excel(io.BytesIO(await file_femeas.read()))
-        df_ped = pd.read_excel(io.BytesIO(await file_ped.read()))
-
-        # Filtrar apenas as linhas de DEP se o arquivo for o relatório formatado em 3 linhas
-        if 'Indicador' in df_machos.columns:
-            df_machos = df_machos[df_machos['Indicador'] == 'DEP'].copy()
-        if 'Indicador' in df_femeas.columns:
-            df_femeas = df_femeas[df_femeas['Indicador'] == 'DEP'].copy()
-
-        # Identificação robusta da coluna de IDs
-        def extrair_col_id(df):
-            for col in ['FBB_ANI', 'FBB_PAI', 'FBB_MAE', 'Name', 'NOME']:
-                if col in df.columns:
-                    return col
-            return df.columns[0]
-
-        col_macho = extrair_col_id(df_machos)
-        col_femea = extrair_col_id(df_femeas)
-
-        # Garantir tipo string
-        df_machos[col_macho] = df_machos[col_macho].astype(str).str.strip()
-        df_femeas[col_femea] = df_femeas[col_femea].astype(str).str.strip()
-
-        # Calcula a matriz de parentesco A
-        A, id_map = calcular_matriz_parentesco(df_ped)
-
-        acasalamentos = []
-        macho_counts = {m: 0 for m in df_machos[col_macho].unique()}
-
-        for _, femea in df_femeas.iterrows():
-            femea_id = str(femea[col_femea]).strip()
-            dep_femea = float(femea.get(dep_alvo, 0.0))
-
-            melhor_macho = None
-            melhor_dep_filho = -999.0
-            melhor_f_filho = 1.0
-
-            for _, macho in df_machos.iterrows():
-                macho_id = str(macho[col_macho]).strip()
-
-                if macho_counts[macho_id] >= max_femeas_por_macho:
-                    continue
-
-                dep_macho = float(macho.get(dep_alvo, 0.0))
-
-                # Endogamia do produto = 0.5 * A(macho, fêmea)
-                if macho_id in id_map and femea_id in id_map:
-                    f_filho = 0.5 * A[id_map[macho_id], id_map[femea_id]]
-                else:
-                    f_filho = 0.0
-
-                # Verifica se atende ao limite máximo de endogamia estipulado pelo usuário
-                if f_filho <= (limite_f + 1e-6):
-                    dep_esperada = (dep_macho + dep_femea) / 2.0
-                    if dep_esperada > melhor_dep_filho:
-                        melhor_dep_filho = dep_esperada
-                        melhor_macho = macho_id
-                        melhor_f_filho = f_filho
-
-            if melhor_macho is not None:
-                macho_counts[melhor_macho] += 1
-                acasalamentos.append({
-                    'Femea': femea_id,
-                    'Macho_Recomendado': melhor_macho,
-                    'DEP_Femea': round(dep_femea, 2),
-                    'DEP_Esperada_Produto': round(melhor_dep_filho, 2),
-                    'Endogamia_Produto_Pct': round(melhor_f_filho * 100, 2)
-                })
-            else:
-                acasalamentos.append({
-                    'Femea': femea_id,
-                    'Macho_Recomendado': 'Nenhum macho atende ao limite de F',
-                    'DEP_Femea': round(dep_femea, 2),
-                    'DEP_Esperada_Produto': np.nan,
-                    'Endogamia_Produto_Pct': np.nan
-                })
-
-        df_res = pd.DataFrame(acasalamentos)
-
-        # Trata médias com fallback para evitar exceção de NaN no JSON
-        dep_media = df_res['DEP_Esperada_Produto'].dropna().mean()
-        f_media = df_res['Endogamia_Produto_Pct'].dropna().mean()
-
-        dep_media_val = round(float(dep_media), 2) if not pd.isna(dep_media) else 0.0
-        f_media_val = round(float(f_media), 2) if not pd.isna(f_media) else 0.0
-
-        # Gerar planilha Excel com os resultados
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            df_res.to_excel(writer, sheet_name='Plano_Acasalamento', index=False)
-            pd.DataFrame(list(macho_counts.items()), columns=['Macho', 'Femeas_Alocadas']).to_excel(writer, sheet_name='Uso_Reprodutores', index=False)
-
-        # Substituir NaN por None/null para serialização JSON limpa
-        df_res_dict = df_res.replace({np.nan: None}).to_dict(orient="records")
-
-        return {
-            "status": "sucesso",
-            "total_femeas": len(df_femeas),
-            "acasalamentos_realizados": int((df_res['Macho_Recomendado'] != 'Nenhum macho atende ao limite de F').sum()),
-            "dep_media_produtos": dep_media_val,
-            "endogamia_media_produtos_pct": f_media_val,
-            "tabela": df_res_dict,
-            "arquivo_excel_b64": base64.b64encode(buf.getvalue()).decode('utf-8')
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
